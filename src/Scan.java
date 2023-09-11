@@ -10,6 +10,8 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -40,6 +42,7 @@ public class Scan extends JFrame{
 	JTextField ipTf = new JTextField();
 	JTextField startTf = new JTextField();
 	JTextField endTf = new JTextField();
+	public static int maxThread = 1000;
 	public Scan() {
         try {
             UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
@@ -155,7 +158,7 @@ public class Scan extends JFrame{
 			public void actionPerformed(ActionEvent e) {
 				sc.model.clear();
 				sc.bar.setValue(0);
-
+				
 				try {
 					String ip =sc.ipTf.getText();
 					InetAddress lmao = InetAddress.getByName(ip);
@@ -169,13 +172,18 @@ public class Scan extends JFrame{
 								for (int i = startPort; i<=endPort; i++) {
 									range.add(i);
 								}
-								for (Integer arg:range) {
-									Thread t1 = new Thread(()->{
-										try {
-											Socket s = new Socket(ip,arg);
-											s.close();
-											String pro="unknown";
-											switch(arg) {
+								ExecutorService executor = Executors.newFixedThreadPool(maxThread);
+
+								for (Integer arg : range) {
+//								    final int threadNumber = arg;
+								    executor.execute(() -> {
+//								        System.out.println("Thread " + threadNumber + " is running on Thread " + Thread.currentThread().getId());
+								        try {
+								            Socket s = new Socket(ip, arg);
+								            s.close();
+								            String pro = "unknown";
+								            switch (arg) {
+								                // Protocol switch case goes here
 											case 20:pro="FTP";break;
 											case 21:pro="FTP";break;
 											case 22:pro="SSH";break;
@@ -205,25 +213,33 @@ public class Scan extends JFrame{
 											case 5005:pro="RTP/RTCP-Real Time Transport(Media)";break;
 											case 5060:pro="SIP-Session Initiation(Media)";break;
 											case 9502:pro="Moxa UPort USB to serial Converter";break;
-											}
-											sc.model.addElement("There is available port at : "+arg+" ("+pro+")");
-											System.out.println("Port here : "+arg);
-											SwingUtilities.invokeLater(()->{
-												sc.bar.setValue(sc.bar.getValue()+1);
-												});
-										} catch (SecurityException e1) {
-											SwingUtilities.invokeLater(()->{
-												sc.bar.setValue(sc.bar.getValue()+1);
-												});		
-										} catch (IOException e1) {
-											System.out.println("No Port available here : "+arg);
-											SwingUtilities.invokeLater(()->{
-												sc.bar.setValue(sc.bar.getValue()+1);
-												});
-										}
-									});
-									t1.start();
+								            }
+								            sc.model.addElement("There is an available port at : " + arg + " (" + pro + ")");
+//								            System.out.println("Port here : " + arg);
+								            SwingUtilities.invokeLater(() -> {
+								                sc.bar.setValue(sc.bar.getValue() + 1);
+								            });
+								        } catch (SecurityException e1) {
+								            SwingUtilities.invokeLater(() -> {
+								                sc.bar.setValue(sc.bar.getValue() + 1);
+								            });
+								        } catch (IOException e1) {
+//								            System.out.println("No Port available here : " + arg);
+								            SwingUtilities.invokeLater(() -> {
+								                sc.bar.setValue(sc.bar.getValue() + 1);
+								            });
+								        }
+								    });
 								}
+
+								// Shutdown the executor after submitting all tasks
+								executor.shutdown();
+//								try {
+//								    executor.awaitTermination(10, TimeUnit.MINUTES);
+//								} catch (InterruptedException ef) {
+//								    Thread.currentThread().interrupt();
+//								}
+
 							}else {
 								JOptionPane.showMessageDialog(null, "End Port must be larger than Start Port","Port value Error", JOptionPane.ERROR_MESSAGE);
 							}
